@@ -146,6 +146,8 @@ class MessageDetailViewController: OWSViewController, MediaDetailPresenter, Medi
                 UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
             ]
         } else {
+            scrollView.applyInsetsFix()
+
             scrollView.autoPinEdge(toSuperviewEdge: .bottom)
         }
 
