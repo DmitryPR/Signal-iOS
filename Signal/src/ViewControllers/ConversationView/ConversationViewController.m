@@ -3905,7 +3905,7 @@ typedef enum : NSUInteger {
 
 - (void)handleKeyboardNotification:(NSNotification *)notification
 {
-    AssertIsOnMainThread();
+    OWSAssertIsOnMainThread();
 
     NSDictionary *userInfo = [notification userInfo];
 
