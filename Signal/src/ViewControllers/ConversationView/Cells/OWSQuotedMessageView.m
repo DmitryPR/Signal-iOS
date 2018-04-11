@@ -25,6 +25,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, nullable) OWSBubbleStrokeView *boundsStrokeView;
 @property (nonatomic, readonly) BOOL isForPreview;
 
+@property (nonatomic, readonly) UILabel *quotedAuthorLabel;
+@property (nonatomic, readonly) UILabel *quotedTextLabel;
+
 @end
 
 #pragma mark -
@@ -50,9 +53,11 @@ NS_ASSUME_NONNULL_BEGIN
         displayableQuotedText = [DisplayableText displayableText:quotedMessage.body];
     }
 
-    return [[OWSQuotedMessageView alloc] initWithQuotedMessage:quotedMessage
-                                         displayableQuotedText:displayableQuotedText
-                                                  isForPreview:YES];
+    OWSQuotedMessageView *instance = [[OWSQuotedMessageView alloc] initWithQuotedMessage:quotedMessage
+                                                                   displayableQuotedText:displayableQuotedText
+                                                                            isForPreview:YES];
+    [instance createContents];
+    return instance;
 }
 
 - (instancetype)initWithQuotedMessage:(OWSQuotedReplyModel *)quotedMessage
@@ -71,7 +76,8 @@ NS_ASSUME_NONNULL_BEGIN
     _displayableQuotedText = displayableQuotedText;
     _isForPreview = isForPreview;
 
-    [self createContents];
+    _quotedAuthorLabel = [UILabel new];
+    _quotedTextLabel = [UILabel new];
 
     return self;
 }
@@ -101,6 +107,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)createContents
 {
+    OWSAssert(!self.boundsStrokeView);
+
     self.backgroundColor = [UIColor whiteColor];
     self.userInteractionEnabled = NO;
     self.layoutMargins = UIEdgeInsetsZero;
@@ -150,7 +158,7 @@ NS_ASSUME_NONNULL_BEGIN
         [quotedAttachmentView setCompressionResistanceHigh];
     }
 
-    UILabel *quotedAuthorLabel = [self createQuotedAuthorLabel];
+    UILabel *quotedAuthorLabel = [self configureQuotedAuthorLabel];
     {
         [self addSubview:quotedAuthorLabel];
         [quotedAuthorLabel autoPinEdgeToSuperviewEdge:ALEdgeTop withInset:self.quotedAuthorTopInset];
@@ -166,6 +174,7 @@ NS_ASSUME_NONNULL_BEGIN
         [quotedAuthorLabel setCompressionResistanceLow];
     }
 
+    UILabel *quotedTextLabel;
     {
         // Stripe and text container.
         UIView *stripeAndTextContainer = [UIView containerView];
@@ -199,7 +208,7 @@ NS_ASSUME_NONNULL_BEGIN
         [quoteStripView setCompressionResistanceHigh];
 
         // Text.
-        UILabel *quotedTextLabel = [self createQuotedTextLabel];
+        quotedTextLabel = [self configureQuotedTextLabel];
         [stripeAndTextContainer addSubview:quotedTextLabel];
         [quotedTextLabel autoPinTopToSuperviewMarginWithInset:self.quotedReplyStripeVExtension];
         [quotedTextLabel autoPinBottomToSuperviewMarginWithInset:self.quotedReplyStripeVExtension];
@@ -238,8 +247,10 @@ NS_ASSUME_NONNULL_BEGIN
     return imageView;
 }
 
-- (UILabel *)createQuotedTextLabel
+- (UILabel *)configureQuotedTextLabel
 {
+    OWSAssert(self.quotedTextLabel);
+
     UIColor *textColor = self.quotedTextColor;
     UIFont *font = self.quotedTextFont;
     NSString *text = @"";
@@ -266,14 +277,13 @@ NS_ASSUME_NONNULL_BEGIN
         font = self.fileTypeFont;
     }
 
-    UILabel *quotedTextLabel = [UILabel new];
-    quotedTextLabel.numberOfLines = self.isForPreview ? 1 : 3;
-    quotedTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    quotedTextLabel.text = text;
-    quotedTextLabel.textColor = textColor;
-    quotedTextLabel.font = font;
+    self.quotedTextLabel.numberOfLines = self.isForPreview ? 1 : 3;
+    self.quotedTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    self.quotedTextLabel.text = text;
+    self.quotedTextLabel.textColor = textColor;
+    self.quotedTextLabel.font = font;
 
-    return quotedTextLabel;
+    return self.quotedTextLabel;
 }
 
 - (nullable NSString *)fileTypeForSnippet
@@ -300,8 +310,10 @@ NS_ASSUME_NONNULL_BEGIN
     return nil;
 }
 
-- (UILabel *)createQuotedAuthorLabel
+- (UILabel *)configureQuotedAuthorLabel
 {
+    OWSAssert(self.quotedAuthorLabel);
+
     NSString *_Nullable localNumber = [TSAccountManager localNumber];
     NSString *quotedAuthorText;
     if ([localNumber isEqualToString:self.quotedMessage.authorId]) {
@@ -317,13 +329,13 @@ NS_ASSUME_NONNULL_BEGIN
             quotedAuthor];
     }
 
-    UILabel *quotedAuthorLabel = [UILabel new];
-    quotedAuthorLabel.text = quotedAuthorText;
-    quotedAuthorLabel.font = self.quotedAuthorFont;
-    quotedAuthorLabel.textColor = [self quotedAuthorColor];
-    quotedAuthorLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    quotedAuthorLabel.numberOfLines = 1;
-    return quotedAuthorLabel;
+    self.quotedAuthorLabel.text = quotedAuthorText;
+    self.quotedAuthorLabel.font = self.quotedAuthorFont;
+    self.quotedAuthorLabel.textColor = [self quotedAuthorColor];
+    self.quotedAuthorLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    self.quotedAuthorLabel.numberOfLines = 1;
+
+    return self.quotedAuthorLabel;
 }
 
 #pragma mark - Measurement
@@ -351,7 +363,7 @@ NS_ASSUME_NONNULL_BEGIN
     {
         CGFloat maxQuotedAuthorWidth = maxWidth - result.width;
 
-        UILabel *quotedAuthorLabel = [self createQuotedAuthorLabel];
+        UILabel *quotedAuthorLabel = [self configureQuotedAuthorLabel];
 
         CGSize quotedAuthorSize
             = CGSizeCeil([quotedAuthorLabel sizeThatFits:CGSizeMake(maxQuotedAuthorWidth, CGFLOAT_MAX)]);
@@ -369,7 +381,7 @@ NS_ASSUME_NONNULL_BEGIN
         CGFloat maxQuotedTextWidth
             = (maxWidth - (result.width + self.quotedReplyStripeThickness + self.quotedReplyStripeHSpacing));
 
-        UILabel *quotedTextLabel = [self createQuotedTextLabel];
+        UILabel *quotedTextLabel = [self configureQuotedTextLabel];
 
         CGSize textSize = CGSizeCeil([quotedTextLabel sizeThatFits:CGSizeMake(maxQuotedTextWidth, CGFLOAT_MAX)]);
         textSize.width = MIN(textSize.width, maxQuotedTextWidth);
